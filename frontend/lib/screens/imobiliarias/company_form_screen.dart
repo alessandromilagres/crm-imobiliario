@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import '../../models/company.dart';
 import '../../services/company_service.dart';
+import '../../services/brasilapi_service.dart';
 import '../../theme/app_theme.dart';
 
 class CompanyFormScreen extends StatefulWidget {
@@ -16,6 +17,7 @@ class CompanyFormScreen extends StatefulWidget {
 class _CompanyFormScreenState extends State<CompanyFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _companyService = CompanyService();
+  final _brasilAPIService = BrasilAPIService();
   
   int _currentStep = 0;
   bool _isLoading = false;
@@ -263,24 +265,52 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
         ),
         const SizedBox(height: 16),
 
-        // CNPJ
-        TextFormField(
-          controller: _cnpjController,
-          decoration: const InputDecoration(
-            labelText: 'CNPJ',
-            prefixIcon: Icon(Icons.badge_outlined),
-          ),
-          keyboardType: TextInputType.number,
-          inputFormatters: [_cnpjMask],
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Campo obrigatório';
-            }
-            if (value.length < 18) {
-              return 'CNPJ inválido';
-            }
-            return null;
-          },
+        // CNPJ com botão de busca
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _cnpjController,
+                decoration: const InputDecoration(
+                  labelText: 'CNPJ',
+                  prefixIcon: Icon(Icons.badge_outlined),
+                  hintText: '00.000.000/0000-00',
+                ),
+                keyboardType: TextInputType.number,
+                inputFormatters: [_cnpjMask],
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Campo obrigatório';
+                  }
+                  if (value.length < 18) {
+                    return 'CNPJ inválido';
+                  }
+                  if (!BrasilAPIService.validarCNPJLocal(value)) {
+                    return 'CNPJ inválido';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            ElevatedButton.icon(
+              onPressed: _isLoading ? null : _buscarDadosCNPJ,
+              icon: _isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.search, size: 20),
+              label: const Text('Buscar'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
 
@@ -347,15 +377,40 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
         Divider(color: AppTheme.cardColor),
         const SizedBox(height: 24),
 
-        // CEP
-        TextFormField(
-          controller: _zipcodeController,
-          decoration: const InputDecoration(
-            labelText: 'CEP',
-            prefixIcon: Icon(Icons.location_on_outlined),
-          ),
-          keyboardType: TextInputType.number,
-          inputFormatters: [_cepMask],
+        // CEP com botão de busca
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _zipcodeController,
+                decoration: const InputDecoration(
+                  labelText: 'CEP',
+                  prefixIcon: Icon(Icons.location_on_outlined),
+                  hintText: '00000-000',
+                ),
+                keyboardType: TextInputType.number,
+                inputFormatters: [_cepMask],
+              ),
+            ),
+            const SizedBox(width: 12),
+            ElevatedButton.icon(
+              onPressed: _isLoading ? null : _buscarEnderecoCEP,
+              icon: _isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.search, size: 20),
+              label: const Text('Buscar'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
 
@@ -499,6 +554,126 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
         ),
       ],
     );
+  }
+
+  /// Busca dados da empresa pelo CNPJ
+  Future<void> _buscarDadosCNPJ() async {
+    final cnpj = _cnpjController.text;
+    
+    if (cnpj.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Digite o CNPJ primeiro'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+      return;
+    }
+    
+    // Valida CNPJ localmente
+    if (!BrasilAPIService.validarCNPJLocal(cnpj)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('CNPJ inválido'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+      return;
+    }
+    
+    setState(() => _isLoading = true);
+    
+    try {
+      final dados = await _brasilAPIService.buscarCNPJ(cnpj);
+      
+      // Preencher campos automaticamente
+      _companyNameController.text = dados['company_name'] ?? '';
+      _tradeNameController.text = dados['trade_name'] ?? '';
+      _emailController.text = dados['email'] ?? '';
+      _phoneController.text = dados['phone'] ?? '';
+      _streetController.text = dados['address_street'] ?? '';
+      _numberController.text = dados['address_number'] ?? '';
+      _complementController.text = dados['address_complement'] ?? '';
+      _neighborhoodController.text = dados['address_neighborhood'] ?? '';
+      _cityController.text = dados['address_city'] ?? '';
+      _stateController.text = dados['address_state'] ?? '';
+      _zipcodeController.text = dados['address_zipcode'] ?? '';
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Dados preenchidos automaticamente!'),
+            backgroundColor: AppTheme.accentColor,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: AppTheme.errorColor,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+  
+  /// Busca endereço pelo CEP
+  Future<void> _buscarEnderecoCEP() async {
+    final cep = _zipcodeController.text;
+    
+    if (cep.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Digite o CEP primeiro'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+      return;
+    }
+    
+    setState(() => _isLoading = true);
+    
+    try {
+      final dados = await _brasilAPIService.buscarCEP(cep);
+      
+      // Preencher campos de endereço
+      _streetController.text = dados['street'] ?? '';
+      _neighborhoodController.text = dados['neighborhood'] ?? '';
+      _cityController.text = dados['city'] ?? '';
+      _stateController.text = dados['state'] ?? '';
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Endereço preenchido automaticamente!'),
+            backgroundColor: AppTheme.accentColor,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: AppTheme.errorColor,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   Widget _buildPlanCard(String value, String title, String subtitle, IconData icon) {

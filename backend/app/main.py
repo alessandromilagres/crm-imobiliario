@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from .database import engine, Base
-from .routes import persons, companies
+from .routes import persons, companies, brasilapi
 
 
 @asynccontextmanager
@@ -37,6 +37,7 @@ app.add_middleware(
 # Incluir rotas
 app.include_router(persons.router)
 app.include_router(companies.router)
+app.include_router(brasilapi.router)
 
 
 @app.get("/")
