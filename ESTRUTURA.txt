@@ -1,0 +1,37 @@
+.
+├── DEMO.md
+├── ESTRUTURA.txt
+├── README.md
+├── backend
+│   ├── Dockerfile
+│   ├── app
+│   │   ├── __init__.py
+│   │   ├── database.py
+│   │   ├── main.py
+│   │   ├── models
+│   │   ├── routes
+│   │   └── schemas
+│   └── requirements.txt
+├── docker-compose.yml
+└── frontend
+    ├── README.md
+    ├── analysis_options.yaml
+    ├── frontend.iml
+    ├── lib
+    │   ├── main.dart
+    │   ├── models
+    │   ├── screens
+    │   ├── services
+    │   ├── theme
+    │   └── widgets
+    ├── pubspec.lock
+    ├── pubspec.yaml
+    ├── test
+    │   └── widget_test.dart
+    └── web
+        ├── favicon.png
+        ├── icons
+        ├── index.html
+        └── manifest.json
+
+15 directories, 19 files
